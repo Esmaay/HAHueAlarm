@@ -574,13 +574,35 @@
     </div>
     <div class="stack">
       <div class="tk"><small>Framework</small><b>Expo (SDK 53+)</b><span>React Native, TypeScript, Expo Router</span></div>
-      <div class="tk"><small>Alarms</small><b>Notifications</b><span>expo-notifications, full-screen / scheduled triggers</span></div>
+      <div class="tk"><small>Alarms</small><b>Notifee + AlarmManager</b><span>Exact alarms, full-screen intent, looping audio</span></div>
       <div class="tk"><small>Audio</small><b>expo-audio</b><span>Looping tone, volume ramp, silent-switch aware</span></div>
       <div class="tk"><small>Storage</small><b>Local-first</b><span>expo-sqlite / AsyncStorage for alarms</span></div>
       <div class="tk"><small>Secrets</small><b>expo-secure-store</b><span>HA token kept in the OS keychain</span></div>
       <div class="tk"><small>Smart home</small><b>HA REST API</b><span>POST /api/services/light/turn_on</span></div>
       <div class="tk"><small>Sensors</small><b>expo-sensors</b><span>Accelerometer for shake-to-dismiss</span></div>
       <div class="tk"><small>Icons</small><b>lucide-react-native</b><span>The stroke set used in these mocks</span></div>
+      <div class="tk"><small>Build</small><b>Dev client</b><span>expo-dev-client — native modules, not Expo Go</span></div>
+    </div>
+
+    <h3 style="font-size:20px;font-weight:800;margin:8px 0 6px">Cross-platform, honestly: one codebase, two alarm engines.</h3>
+    <p class="lead" style="margin-bottom:20px">Expo ships both iOS and Android from a single codebase and the dark UI is identical on
+      both — only small platform manners differ (Android back gesture, top-bar action, edge-to-edge). The real divergence is
+      how each OS lets an alarm fire, and it runs counter to intuition: <b style="color:var(--dawn)">Android is the more capable
+      alarm platform.</b></p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:20px">
+      <div class="card"><div class="ic"><svg class="i"><use href="#ic-clock"/></svg></div><h3>Android · permissive</h3>
+        <p><code>AlarmManager.setAlarmClock()</code> fires exact through Doze; a <b>full-screen intent</b> launches the ringing
+        screen over the lock screen; a foreground service loops audio. Native alarm-app behaviour — we get the full experience.</p></div>
+      <div class="card"><div class="ic"><svg class="i"><use href="#ic-bell"/></svg></div><h3>iOS · constrained</h3>
+        <p>Notification-based: bundled sound (~30s cap), <b>Critical Alerts</b> entitlement to break through silent/Focus. A true
+        full-screen takeover from a killed state isn’t guaranteed — so the Hue light, fired by HA on schedule, is a real
+        reliability backstop.</p></div>
+    </div>
+    <div class="callout" style="margin-bottom:34px">
+      <p><b>Permissions we’ll request.</b> Android — <code>POST_NOTIFICATIONS</code>, <code>SCHEDULE_EXACT_ALARM</code>,
+      <code>USE_FULL_SCREEN_INTENT</code>, plus a friendly “disable battery optimisation” prompt for rock-solid firing.
+      iOS — notifications and (optionally) the Critical Alerts entitlement. Both handled with clear, in-context asks — never a
+      wall of dialogs on first launch.</p>
     </div>
 
     <div class="callout" style="margin-bottom:34px">
