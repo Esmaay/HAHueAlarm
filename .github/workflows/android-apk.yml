@@ -1,0 +1,67 @@
+name: Android APK
+
+# Builds a standalone, installable APK and uploads it as a workflow artifact so
+# the app can be tested on a real device without a local checkout or an Expo
+# account. Trigger it manually from the Actions tab, or it runs automatically on
+# pushes to the development branch.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/expo-alarm-app-pcw9ey
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Raise Gradle heap
+        # Overrides the default heap so the release build doesn't OOM on a runner.
+        run: echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hahuealarm-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error

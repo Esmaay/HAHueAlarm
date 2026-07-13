@@ -10,9 +10,11 @@
     "backgroundColor": "#14110D",
     "ios": {
       "icon": "./assets/expo.icon",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "net.craftville.hahuealarm"
     },
     "android": {
+      "package": "net.craftville.hahuealarm",
       "adaptiveIcon": {
         "backgroundColor": "#14110D",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
