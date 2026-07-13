@@ -1,17 +1,18 @@
 /**
  * Coordinates a ringing alarm: the single source of truth for "an alarm is
  * going off right now" plus the side effects that go with it — looping audio,
- * the Hue sunrise, and rolling the schedule forward.
+ * the Hue lights, and rolling the schedule forward.
  *
- * Screens observe `ringingAlarm` and call `dismiss` / `snooze`; the actual
- * notification listeners and the foreground watcher call `trigger`. Keeping this
- * in a store (not a screen) means the alarm keeps ringing across navigation.
+ * The gradual pre-alarm ramp is owned by the sunrise scheduler; here we just
+ * snap the room to full daylight when the alarm actually rings (covering the
+ * case where the pre-ramp never ran), and apply the after-dismiss action.
  */
 
 import { create } from 'zustand';
 
 import { useHAStore } from '@/features/homeassistant/store';
-import { applyPostDismiss, shouldRunSunrise, startSunrise, type SunriseHandle } from '@/features/sunrise/engine';
+import { applyPostDismiss, setFullDaylight, shouldRunSunrise } from '@/features/sunrise/engine';
+import { cancelSunrise } from '@/features/sunrise/scheduler';
 
 import { startAlarmSound, stopAlarmSound } from './audio';
 import { scheduleAlarm, scheduleSnooze } from './notifications';
@@ -28,15 +29,9 @@ interface RingState {
   snooze: () => void;
 }
 
-let sunriseHandle: SunriseHandle | null = null;
-
 function stopOutputs(): void {
   void stopAlarmSound();
-
-  if (sunriseHandle) {
-    sunriseHandle.cancel();
-    sunriseHandle = null;
-  }
+  cancelSunrise();
 }
 
 export const useRingController = create<RingState>((set, get) => ({
@@ -60,7 +55,9 @@ export const useRingController = create<RingState>((set, get) => ({
     const haConfig = useHAStore.getState().config;
 
     if (haConfig && shouldRunSunrise(alarm.sunrise)) {
-      sunriseHandle = startSunrise(haConfig, alarm.sunrise);
+      // Stop the gradual pre-ramp and make sure the room is fully lit now.
+      cancelSunrise();
+      void setFullDaylight(haConfig, alarm.sunrise);
     }
 
     // Roll the schedule forward: repeating alarms get their next occurrence;

@@ -18,6 +18,9 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { useHAStore } from '@/features/homeassistant/store';
+import { cancelSunrise, syncSunrise } from '@/features/sunrise/scheduler';
+
 import { nextEnabledAlarm, nextOccurrenceOf } from './format';
 import {
   configureNotificationHandler,
@@ -42,6 +45,8 @@ export function AlarmRuntime() {
 
   const ringingAlarmId = useRingController((state) => state.ringingAlarm?.id ?? null);
   const trigger = useRingController((state) => state.trigger);
+
+  const haConfig = useHAStore((state) => state.config);
 
   // Bumped when the app returns to the foreground, to re-arm the timer.
   const [resumeTick, setResumeTick] = useState(0);
@@ -113,6 +118,16 @@ export function AlarmRuntime() {
 
     return () => subscription.remove();
   }, []);
+
+  // Arm/reconcile the pre-alarm sunrise ramp (idempotent for the same alarm).
+  useEffect(() => {
+    if (hydrated) {
+      syncSunrise(alarms, haConfig);
+    }
+  }, [alarms, hydrated, haConfig, ringingAlarmId, resumeTick]);
+
+  // Stop any ramp when the runtime unmounts.
+  useEffect(() => cancelSunrise, []);
 
   // Centralised navigation: whenever an alarm starts, show the ringing screen.
   useEffect(() => {

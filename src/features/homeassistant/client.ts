@@ -98,7 +98,7 @@ export async function fetchLightEntities(config: HAConfig): Promise<HAEntity[]> 
 export async function setLight(
   config: HAConfig,
   entityIds: string[],
-  options: { brightnessPct?: number; colorTempKelvin?: number },
+  options: { brightnessPct?: number; colorTempKelvin?: number; transitionSeconds?: number },
 ): Promise<void> {
   const body: Record<string, unknown> = { entity_id: entityIds };
 
@@ -108,6 +108,11 @@ export async function setLight(
 
   if (options.colorTempKelvin !== undefined) {
     body.color_temp_kelvin = options.colorTempKelvin;
+  }
+
+  if (options.transitionSeconds !== undefined) {
+    // Let Hue glide between steps so even a coarse ramp looks continuous.
+    body.transition = options.transitionSeconds;
   }
 
   const response = await haFetch(config, '/api/services/light/turn_on', {
