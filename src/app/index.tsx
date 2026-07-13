@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Plus, Settings2 } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 
@@ -69,11 +69,20 @@ export default function AlarmListScreen() {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <AppText variant="display">Alarms</AppText>
-          <IconButton
-            icon={Plus}
-            onPress={() => openEditor('new')}
-            accessibilityLabel="Add alarm"
-          />
+          <View style={styles.headerActions}>
+            <IconButton
+              icon={Settings2}
+              variant="ghost"
+              color={theme.color.textSoft}
+              onPress={() => router.push('/settings/home-assistant')}
+              accessibilityLabel="Home Assistant settings"
+            />
+            <IconButton
+              icon={Plus}
+              onPress={() => openEditor('new')}
+              accessibilityLabel="Add alarm"
+            />
+          </View>
         </View>
         <NextAlarmSummary alarms={alarms} />
       </View>
@@ -118,6 +127,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.xs,
   },
   list: {
     paddingBottom: theme.space.xxxl,

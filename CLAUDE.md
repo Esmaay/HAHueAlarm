@@ -37,6 +37,11 @@ require a **development build** — they do not run in Expo Go.
   - `store.ts` — persisted Zustand store (AsyncStorage), seeds an example on first launch
   - `editorStore.ts` — transient working draft shared across editor sub-screens
   - `components/` — alarm-specific views (`AlarmListItem`, `TimePicker`, `SunrisePreview`, …)
+- **`src/features/homeassistant/`** — the Home Assistant connection:
+  - `client.ts` — REST calls (test connection, fetch `light.*` entities, `light.turn_on`)
+  - `store.ts` — connection config persisted in **expo-secure-store** (the keychain, not
+    AsyncStorage — it holds a credential); runtime status + fetched light list
+  - Credentials are entered in-app on `app/settings/home-assistant.tsx`, never committed.
 - **`src/theme/`** — the single source of design tokens. Dark-only by intent.
 
 ## Conventions

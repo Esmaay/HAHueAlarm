@@ -10,4 +10,5 @@ export { Row } from './Row';
 export { Screen } from './Screen';
 export { SectionLabel } from './SectionLabel';
 export { SegmentedControl, type SegmentOption } from './SegmentedControl';
+export { TextField } from './TextField';
 export { WeekdayPicker } from './WeekdayPicker';
