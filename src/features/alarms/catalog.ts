@@ -26,8 +26,8 @@ export const SOUND_OPTIONS: readonly SoundOption[] = [
   { id: 'birdsong', label: 'Birdsong' },
   { id: 'radar', label: 'Radar' },
   { id: 'chimes', label: 'Chimes' },
-  { id: 'sunrise-tone', label: 'Sunrise' },
-  { id: 'classic-bell', label: 'Classic Bell' },
+  { id: 'sunrise_tone', label: 'Sunrise' },
+  { id: 'classic_bell', label: 'Classic Bell' },
 ] as const;
 
 export interface SunriseStyleOption {

@@ -63,10 +63,10 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/sounds/sunrise-tone.wav",
+            "./assets/sounds/sunrise_tone.wav",
             "./assets/sounds/chimes.wav",
             "./assets/sounds/radar.wav",
-            "./assets/sounds/classic-bell.wav",
+            "./assets/sounds/classic_bell.wav",
             "./assets/sounds/birdsong.wav"
           ],
           "color": "#FFB45A"

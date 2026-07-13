@@ -8,15 +8,17 @@
  * notification and the in-app looping player use one set of tones.
  */
 
+// Keys double as Android res/raw resource names, so they must be
+// underscore-safe (no hyphens): a-z, 0-9, underscore only.
 const SOUND_ASSETS: Record<string, number> = {
-  'sunrise-tone': require('../../../assets/sounds/sunrise-tone.wav'),
+  sunrise_tone: require('../../../assets/sounds/sunrise_tone.wav'),
   chimes: require('../../../assets/sounds/chimes.wav'),
   radar: require('../../../assets/sounds/radar.wav'),
-  'classic-bell': require('../../../assets/sounds/classic-bell.wav'),
+  classic_bell: require('../../../assets/sounds/classic_bell.wav'),
   birdsong: require('../../../assets/sounds/birdsong.wav'),
 };
 
-const FALLBACK_SOUND_ID = 'sunrise-tone';
+const FALLBACK_SOUND_ID = 'sunrise_tone';
 
 /** All shipped sound ids, in catalog order-ish; used to build channels. */
 export const SOUND_IDS: readonly string[] = Object.keys(SOUND_ASSETS);
