@@ -48,16 +48,13 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
 
-      - name: Raise Gradle heap
-        # Overrides the default heap so the release build doesn't OOM on a runner.
-        run: echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build release APK
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace --info
+        # prebuild already sets a sane org.gradle.jvmargs in gradle.properties.
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
