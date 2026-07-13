@@ -53,8 +53,10 @@ jobs:
 
       - name: Build release APK
         working-directory: android
-        # prebuild already sets a sane org.gradle.jvmargs in gradle.properties.
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        # prebuild already sets sane jvmargs + org.gradle.parallel in gradle.properties.
+        # --build-cache reuses Kotlin/Java task outputs across runs; the cache lives in
+        # the Gradle user home, which setup-gradle persists between runs on this branch.
+        run: ./gradlew assembleRelease --no-daemon --stacktrace --build-cache
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
