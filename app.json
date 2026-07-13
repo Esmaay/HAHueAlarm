@@ -20,6 +20,12 @@
     },
     "android": {
       "package": "net.craftville.hahuealarm",
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#14110D",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -50,6 +56,20 @@
           "android": {
             "usesCleartextTraffic": true
           }
+        }
+      ],
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/sunrise-tone.wav",
+            "./assets/sounds/chimes.wav",
+            "./assets/sounds/radar.wav",
+            "./assets/sounds/classic-bell.wav",
+            "./assets/sounds/birdsong.wav"
+          ],
+          "color": "#FFB45A"
         }
       ]
     ],

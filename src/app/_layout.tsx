@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AlarmRuntime } from '@/features/alarms/AlarmRuntime';
 import { theme } from '@/theme';
 
 /**
@@ -15,6 +16,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style="light" />
+        <AlarmRuntime />
 
         <Stack
           screenOptions={{
@@ -25,6 +27,10 @@ export default function RootLayout() {
         >
           <Stack.Screen name="index" />
           <Stack.Screen name="alarm/[id]" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen
+            name="ring"
+            options={{ animation: 'fade', gestureEnabled: false }}
+          />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

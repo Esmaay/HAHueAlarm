@@ -36,7 +36,14 @@ require a **development build** — they do not run in Expo Go.
   - `format.ts` — pure time/schedule helpers (no React, unit-testable)
   - `store.ts` — persisted Zustand store (AsyncStorage), seeds an example on first launch
   - `editorStore.ts` — transient working draft shared across editor sub-screens
+  - `notifications.ts` — expo-notifications scheduling (per-sound Android channels)
+  - `audio.ts` — looping alarm playback with a volume ramp (expo-audio)
+  - `ringController.ts` — the "an alarm is ringing now" store + its side effects
+  - `AlarmRuntime.tsx` — headless root runtime: schedules, listens, fires on time
+  - `sounds.ts` — sound-id → bundled WAV asset map (tones synthesised in build)
   - `components/` — alarm-specific views (`AlarmListItem`, `TimePicker`, `SunrisePreview`, …)
+- **`src/features/sunrise/`** — `engine.ts`: ramps Hue brightness + colour temp over
+  time via the HA client while an alarm rings; graceful fallback if HA is unreachable.
 - **`src/features/homeassistant/`** — the Home Assistant connection:
   - `client.ts` — REST calls (test connection, fetch `light.*` entities, `light.turn_on`)
   - `store.ts` — connection config persisted in **expo-secure-store** (the keychain, not
@@ -58,5 +65,13 @@ require a **development build** — they do not run in Expo Go.
 
 ## Status
 
-Phase 1 (design system + alarm list + editor + local persistence) is complete.
-Next: Phase 2 — reliable scheduled alarms, looping audio, and the ringing screen.
+Phases 1–2 complete: design system, alarm list + editor, local persistence,
+Home Assistant connection + live light picker, and alarms that **fire** —
+scheduled notifications, looping audio with a volume ramp, the full-screen
+ringing screen (snooze / hold-to-stop / shake-to-dismiss), and the Hue sunrise
+firing on ring.
+
+Firing is reliable while the app is foregrounded (a precise in-app timer) and
+via notifications when backgrounded. **Known gap:** true locked-screen /
+app-killed full-screen firing needs Notifee (`AlarmManager` + full-screen
+intents) — the next reliability iteration, best done with on-device testing.

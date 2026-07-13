@@ -120,4 +120,28 @@ export async function setLight(
   }
 }
 
+/** Turn the given lights off (used by the "turn off after dismiss" option). */
+export async function turnOffLights(config: HAConfig, entityIds: string[]): Promise<void> {
+  const response = await haFetch(config, '/api/services/light/turn_off', {
+    method: 'POST',
+    body: JSON.stringify({ entity_id: entityIds }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Home Assistant returned ${response.status}.`);
+  }
+}
+
+/** Activate a Home Assistant scene by entity id. */
+export async function activateScene(config: HAConfig, sceneId: string): Promise<void> {
+  const response = await haFetch(config, '/api/services/scene/turn_on', {
+    method: 'POST',
+    body: JSON.stringify({ entity_id: sceneId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Home Assistant returned ${response.status}.`);
+  }
+}
+
 export { friendlyError };
