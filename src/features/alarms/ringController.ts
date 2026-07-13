@@ -1,11 +1,11 @@
 /**
  * Coordinates a ringing alarm: the single source of truth for "an alarm is
- * going off right now" plus the side effects that go with it — looping audio,
- * the Hue lights, and rolling the schedule forward.
+ * going off right now" plus the side effects that go with it.
  *
- * The gradual pre-alarm ramp is owned by the sunrise scheduler; here we just
- * snap the room to full daylight when the alarm actually rings (covering the
- * case where the pre-ramp never ran), and apply the after-dismiss action.
+ * The alarm *sound* is owned by Notifee (the trigger notification loops the
+ * channel sound, so it rings on a locked phone without the app running). This
+ * controller therefore drives the lights and the schedule, and stops the sound
+ * on dismiss/snooze by cancelling that notification.
  */
 
 import { create } from 'zustand';
@@ -14,9 +14,7 @@ import { useHAStore } from '@/features/homeassistant/store';
 import { applyPostDismiss, setFullDaylight, shouldRunSunrise } from '@/features/sunrise/engine';
 import { cancelSunrise } from '@/features/sunrise/scheduler';
 
-import { startAlarmSound, stopAlarmSound } from './audio';
-import { scheduleAlarm, scheduleSnooze } from './notifications';
-import { soundAsset } from './sounds';
+import { cancelRinging, scheduleAlarm, scheduleSnooze } from './notifications';
 import { useAlarmStore } from './store';
 import type { Alarm } from './types';
 
@@ -29,9 +27,8 @@ interface RingState {
   snooze: () => void;
 }
 
-function stopOutputs(): void {
-  void stopAlarmSound();
-  cancelSunrise();
+function isRepeating(alarm: Alarm): boolean {
+  return alarm.repeatDays.length > 0;
 }
 
 export const useRingController = create<RingState>((set, get) => ({
@@ -50,8 +47,6 @@ export const useRingController = create<RingState>((set, get) => ({
 
     set({ ringingAlarm: alarm });
 
-    void startAlarmSound(soundAsset(alarm.soundId));
-
     const haConfig = useHAStore.getState().config;
 
     if (haConfig && shouldRunSunrise(alarm.sunrise)) {
@@ -60,24 +55,30 @@ export const useRingController = create<RingState>((set, get) => ({
       void setFullDaylight(haConfig, alarm.sunrise);
     }
 
-    // Roll the schedule forward: repeating alarms get their next occurrence;
-    // a one-shot alarm switches itself off after firing.
-    if (alarm.repeatDays.length === 0) {
+    // A one-shot alarm switches itself off after firing; repeats are
+    // rescheduled on dismiss/snooze so the current ring isn't disturbed.
+    if (!isRepeating(alarm)) {
       useAlarmStore.getState().toggleAlarm(alarm.id, false);
-    } else {
-      void scheduleAlarm(alarm);
     }
   },
 
   dismiss: () => {
     const alarm = get().ringingAlarm;
 
-    stopOutputs();
+    if (alarm) {
+      void cancelRinging(alarm.id);
+    }
+
+    cancelSunrise();
 
     const haConfig = useHAStore.getState().config;
 
     if (alarm && haConfig && shouldRunSunrise(alarm.sunrise)) {
       void applyPostDismiss(haConfig, alarm.sunrise);
+    }
+
+    if (alarm && isRepeating(alarm)) {
+      void scheduleAlarm(alarm); // Arm the next occurrence.
     }
 
     set({ ringingAlarm: null });
@@ -86,12 +87,16 @@ export const useRingController = create<RingState>((set, get) => ({
   snooze: () => {
     const alarm = get().ringingAlarm;
 
-    stopOutputs();
-
     if (alarm) {
+      void cancelRinging(alarm.id);
       void scheduleSnooze(alarm, alarm.snoozeMinutes);
+
+      if (isRepeating(alarm)) {
+        void scheduleAlarm(alarm); // Keep the regular repeat going too.
+      }
     }
 
+    cancelSunrise();
     set({ ringingAlarm: null });
   },
 }));

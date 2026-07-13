@@ -19,6 +19,7 @@ import { formatRingsIn } from '@/features/alarms/format';
 import { useEditorStore } from '@/features/alarms/editorStore';
 import { useAlarmStore } from '@/features/alarms/store';
 import type { SunriseStyle } from '@/features/alarms/types';
+import { useNow } from '@/lib/useNow';
 import { theme } from '@/theme';
 
 /** Summary shown on the Sunrise row: "20 min · Warm wake", or "Off". */
@@ -37,6 +38,9 @@ function sunriseRowValue(enabled: boolean, durationMin: number, style: SunriseSt
  */
 export default function AlarmEditorScreen() {
   const router = useRouter();
+
+  // Keep the "Rings in …" preview under the picker current.
+  useNow(30_000);
 
   const draft = useEditorStore((state) => state.draft);
   const editingId = useEditorStore((state) => state.editingId);

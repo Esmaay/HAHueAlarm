@@ -23,6 +23,8 @@
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_EXACT_ALARM",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS"
       ],
@@ -71,7 +73,8 @@
           ],
           "color": "#FFB45A"
         }
-      ]
+      ],
+      "./plugins/withAlarmAndroid"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -10,6 +10,7 @@ import { useEditorStore } from '@/features/alarms/editorStore';
 import { formatTime, nextEnabledAlarm, timeUntil, toClockParts } from '@/features/alarms/format';
 import { useAlarmStore } from '@/features/alarms/store';
 import type { Alarm } from '@/features/alarms/types';
+import { useNow } from '@/lib/useNow';
 import { theme } from '@/theme';
 
 /** The soonest upcoming alarm, phrased for the header, or a resting message. */
@@ -40,6 +41,10 @@ function NextAlarmSummary({ alarms }: { alarms: Alarm[] }) {
 
 export default function AlarmListScreen() {
   const router = useRouter();
+
+  // Keep the "next alarm · in Xh Ym" summary ticking.
+  useNow(30_000);
+
   const alarms = useAlarmStore((state) => state.alarms);
   const toggleAlarm = useAlarmStore((state) => state.toggleAlarm);
   const getAlarm = useAlarmStore((state) => state.getAlarm);

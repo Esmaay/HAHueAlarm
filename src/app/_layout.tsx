@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AlarmRuntime } from '@/features/alarms/AlarmRuntime';
+import '@/features/alarms/notifeeBackground';
 import { theme } from '@/theme';
 
 /**

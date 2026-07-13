@@ -1,19 +1,18 @@
 /**
  * Headless runtime that makes alarms actually fire. Rendered once at the root.
  *
- * Responsibilities, one per effect:
- *   • prepare notification channels + permissions,
- *   • keep the OS schedule in sync with the stored alarms,
- *   • react to notification taps/deliveries by starting the ring,
- *   • while the app is foregrounded, fire the next alarm precisely on time,
- *   • send the user to the ringing screen whenever an alarm starts.
- *
- * The foreground timer is what makes "set an alarm, keep the app open" reliable;
- * the notifications cover the backgrounded case. True locked-screen firing is a
- * Notifee follow-up.
+ * Notifee owns firing now: each alarm is an exact AlarmManager trigger whose
+ * notification loops the sound and carries a full-screen action, so it rings and
+ * launches the ring screen over the lock screen without the app running. This
+ * component just:
+ *   • prepares channels + permission,
+ *   • keeps the trigger schedule in sync with the stored alarms,
+ *   • turns Notifee delivery/press (and a cold full-screen launch) into a ring,
+ *   • drives the foreground pre-alarm sunrise ramp,
+ *   • sends the user to the ringing screen whenever an alarm starts.
  */
 
-import * as Notifications from 'expo-notifications';
+import notifee, { EventType } from '@notifee/react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
@@ -21,21 +20,9 @@ import { AppState } from 'react-native';
 import { useHAStore } from '@/features/homeassistant/store';
 import { cancelSunrise, syncSunrise } from '@/features/sunrise/scheduler';
 
-import { nextEnabledAlarm, nextOccurrenceOf } from './format';
-import {
-  configureNotificationHandler,
-  ensureChannels,
-  requestNotificationPermissions,
-  syncAlarms,
-} from './notifications';
+import { alarmIdOf, ensureChannels, requestAlarmPermissions, syncAlarms } from './notifications';
 import { useRingController } from './ringController';
 import { useAlarmStore } from './store';
-
-/** Don't hold a foreground timer for alarms more than a day out. */
-const MAX_TIMER_MS = 26 * 60 * 60 * 1000;
-
-// Register the foreground presentation behaviour once, at module load.
-configureNotificationHandler();
 
 export function AlarmRuntime() {
   const router = useRouter();
@@ -48,67 +35,56 @@ export function AlarmRuntime() {
 
   const haConfig = useHAStore((state) => state.config);
 
-  // Bumped when the app returns to the foreground, to re-arm the timer.
+  // Bumped when the app returns to the foreground, to re-arm the sunrise ramp.
   const [resumeTick, setResumeTick] = useState(0);
 
   // Channels + permission, once.
   useEffect(() => {
     void ensureChannels();
-    void requestNotificationPermissions();
+    void requestAlarmPermissions();
   }, []);
 
-  // Keep the OS schedule aligned with the stored alarms.
+  // Keep the trigger schedule aligned with the stored alarms.
   useEffect(() => {
     if (hydrated) {
       void syncAlarms(alarms);
     }
   }, [alarms, hydrated]);
 
-  // Notification tap or foreground delivery → start ringing.
+  // A full-screen launch or notification tap while the app is live → start ringing.
   useEffect(() => {
-    function handle(notification: Notifications.Notification) {
-      const alarmId = notification.request.content.data?.alarmId;
+    return notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.DELIVERED || type === EventType.PRESS) {
+        const alarmId = alarmIdOf(detail.notification);
 
-      if (typeof alarmId === 'string') {
-        trigger(alarmId);
+        if (alarmId) {
+          trigger(alarmId);
+        }
       }
-    }
-
-    const received = Notifications.addNotificationReceivedListener(handle);
-    const response = Notifications.addNotificationResponseReceivedListener((event) =>
-      handle(event.notification),
-    );
-
-    return () => {
-      received.remove();
-      response.remove();
-    };
+    });
   }, [trigger]);
 
-  // Re-arm the precise foreground timer on any relevant change.
+  // Cold start from a full-screen intent / notification press.
   useEffect(() => {
-    if (!hydrated || ringingAlarmId) {
-      return;
+    void notifee.getInitialNotification().then((initial) => {
+      const alarmId = alarmIdOf(initial?.notification);
+
+      if (alarmId) {
+        trigger(alarmId);
+      }
+    });
+  }, [trigger]);
+
+  // Arm/reconcile the pre-alarm sunrise ramp (idempotent for the same alarm).
+  useEffect(() => {
+    if (hydrated) {
+      syncSunrise(alarms, haConfig);
     }
+  }, [alarms, hydrated, haConfig, ringingAlarmId, resumeTick]);
 
-    const soonest = nextEnabledAlarm(alarms);
+  useEffect(() => cancelSunrise, []);
 
-    if (!soonest) {
-      return;
-    }
-
-    const delay = nextOccurrenceOf(soonest).getTime() - Date.now();
-
-    if (delay > MAX_TIMER_MS) {
-      return;
-    }
-
-    const timer = setTimeout(() => trigger(soonest.id), Math.max(0, delay));
-
-    return () => clearTimeout(timer);
-  }, [alarms, hydrated, ringingAlarmId, resumeTick, trigger]);
-
-  // Recompute the timer when the app comes back to the foreground.
+  // Recompute the sunrise timing when the app comes back to the foreground.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
@@ -118,16 +94,6 @@ export function AlarmRuntime() {
 
     return () => subscription.remove();
   }, []);
-
-  // Arm/reconcile the pre-alarm sunrise ramp (idempotent for the same alarm).
-  useEffect(() => {
-    if (hydrated) {
-      syncSunrise(alarms, haConfig);
-    }
-  }, [alarms, hydrated, haConfig, ringingAlarmId, resumeTick]);
-
-  // Stop any ramp when the runtime unmounts.
-  useEffect(() => cancelSunrise, []);
 
   // Centralised navigation: whenever an alarm starts, show the ringing screen.
   useEffect(() => {

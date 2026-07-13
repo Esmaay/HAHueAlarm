@@ -1,23 +1,32 @@
 /**
- * OS-level alarm scheduling via expo-notifications.
+ * Alarm scheduling via Notifee — the piece that makes alarms fire on a locked
+ * phone.
  *
- * Each sound gets its own Android channel (a channel's sound is fixed at
- * creation, so per-alarm tones need per-sound channels) at MAX importance so
- * the alarm heads-up and rings through Do Not Disturb. Notifications carry the
- * `alarmId` in their data so taps and reschedules can find the alarm.
+ * Each alarm is a Notifee **timestamp trigger** backed by AlarmManager
+ * (`allowWhileIdle` → exact, fires through Doze). The displayed notification
+ * carries a **full-screen action**, so when it fires Android launches the app
+ * over the lock screen (MainActivity is flagged show-when-locked by the config
+ * plugin), and **loops the channel sound** so it keeps ringing until dismissed.
  *
- * Scheduling is "rolling": we schedule the next occurrence; when an alarm fires
- * the app reschedules the following one. This is reliable while the app is
- * opened periodically — true always-on background firing is a Notifee follow-up.
+ * Sound files are copied into res/raw by the expo-notifications config plugin;
+ * Notifee references them by resource name (no extension). One channel per sound
+ * because a channel's sound is fixed at creation.
  */
 
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import notifee, {
+  AndroidCategory,
+  AndroidImportance,
+  AndroidVisibility,
+  AuthorizationStatus,
+  type Notification,
+  TriggerType,
+  type TimestampTrigger,
+} from '@notifee/react-native';
 
 import { palette } from '@/theme';
 
 import { formatTime, nextOccurrenceOf, toClockParts } from './format';
-import { knownSoundId, notificationSoundName, SOUND_IDS } from './sounds';
+import { knownSoundId, SOUND_IDS } from './sounds';
 import type { Alarm } from './types';
 
 const CHANNEL_PREFIX = 'alarm-';
@@ -26,53 +35,43 @@ function channelId(soundId: string): string {
   return `${CHANNEL_PREFIX}${knownSoundId(soundId)}`;
 }
 
-/**
- * Foreground presentation. Sound is left to the in-app looping player (which
- * starts when the alarm fires), so the OS sound is suppressed here to avoid
- * doubling; backgrounded delivery still rings via the channel sound.
- */
-export function configureNotificationHandler(): void {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
-  });
+/** Stable per-alarm notification id so we can cancel/replace precisely. */
+function notificationId(alarmId: string): string {
+  return `alarm-${alarmId}`;
 }
 
-/** Create one high-importance channel per sound. Android-only; safe to re-run. */
-export async function ensureChannels(): Promise<void> {
-  if (Platform.OS !== 'android') {
-    return;
-  }
+/** Pull the alarm id back out of a fired/tapped notification. */
+export function alarmIdOf(notification?: Notification): string | null {
+  const value = notification?.data?.alarmId;
 
+  return typeof value === 'string' ? value : null;
+}
+
+/** One high-importance, DnD-bypassing channel per sound. Safe to re-run. */
+export async function ensureChannels(): Promise<void> {
   await Promise.all(
     SOUND_IDS.map((id) =>
-      Notifications.setNotificationChannelAsync(channelId(id), {
+      notifee.createChannel({
+        id: channelId(id),
         name: `Alarm — ${id}`,
-        importance: Notifications.AndroidImportance.MAX,
-        sound: notificationSoundName(id),
-        vibrationPattern: [0, 400, 250, 400],
+        importance: AndroidImportance.HIGH,
+        sound: id,
+        vibration: true,
+        vibrationPattern: [300, 500, 300, 500],
         bypassDnd: true,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        visibility: AndroidVisibility.PUBLIC,
+        lights: true,
         lightColor: palette.dawn,
       }),
     ),
   );
 }
 
-export async function requestNotificationPermissions(): Promise<boolean> {
-  const current = await Notifications.getPermissionsAsync();
+/** Request notification permission (and surface the exact-alarm screen if needed). */
+export async function requestAlarmPermissions(): Promise<boolean> {
+  const settings = await notifee.requestPermission();
 
-  if (current.granted) {
-    return true;
-  }
-
-  const requested = await Notifications.requestPermissionsAsync();
-
-  return requested.granted;
+  return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
 }
 
 function alarmBody(alarm: Alarm): string {
@@ -81,61 +80,63 @@ function alarmBody(alarm: Alarm): string {
   return `${formatTime(alarm.hour, alarm.minute)} ${clock.period}`;
 }
 
+function buildNotification(alarm: Alarm): Notification {
+  return {
+    id: notificationId(alarm.id),
+    title: alarm.label.trim() || 'Alarm',
+    body: alarmBody(alarm),
+    data: { alarmId: alarm.id },
+    android: {
+      channelId: channelId(alarm.soundId),
+      category: AndroidCategory.ALARM,
+      importance: AndroidImportance.HIGH,
+      visibility: AndroidVisibility.PUBLIC,
+      loopSound: true,
+      ongoing: true,
+      autoCancel: false,
+      // Launch the app over the lock screen, ringing-screen and all.
+      fullScreenAction: { id: 'default' },
+      pressAction: { id: 'default' },
+    },
+  };
+}
+
+async function createTrigger(notification: Notification, whenMs: number): Promise<void> {
+  const trigger: TimestampTrigger = {
+    type: TriggerType.TIMESTAMP,
+    timestamp: whenMs,
+    alarmManager: { allowWhileIdle: true },
+  };
+
+  await notifee.createTriggerNotification(notification, trigger);
+}
+
 /** Schedule the next occurrence of one alarm. No-op if disabled. */
 export async function scheduleAlarm(alarm: Alarm): Promise<void> {
   if (!alarm.enabled) {
     return;
   }
 
-  const soundId = knownSoundId(alarm.soundId);
-
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: alarm.label.trim() || 'Alarm',
-      body: alarmBody(alarm),
-      sound: notificationSoundName(soundId),
-      data: { alarmId: alarm.id },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: nextOccurrenceOf(alarm),
-      channelId: channelId(soundId),
-    },
-  });
+  await createTrigger(buildNotification(alarm), nextOccurrenceOf(alarm).getTime());
 }
 
-/** Fire a fresh notification `minutes` from now for a snoozed alarm. */
+/** Re-fire a snoozed alarm `minutes` from now. */
 export async function scheduleSnooze(alarm: Alarm, minutes: number): Promise<void> {
-  const soundId = knownSoundId(alarm.soundId);
+  const when = Date.now() + Math.max(1, Math.round(minutes)) * 60_000;
 
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: alarm.label.trim() || 'Alarm',
-      body: 'Snoozed',
-      sound: notificationSoundName(soundId),
-      data: { alarmId: alarm.id },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: Math.max(1, Math.round(minutes * 60)),
-      channelId: channelId(soundId),
-    },
-  });
+  await createTrigger({ ...buildNotification(alarm), id: `snooze-${alarm.id}` }, when);
 }
 
-/** Cancel any scheduled notifications belonging to one alarm. */
-export async function cancelAlarm(alarmId: string): Promise<void> {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-
-  await Promise.all(
-    scheduled
-      .filter((item) => item.content.data?.alarmId === alarmId)
-      .map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier)),
-  );
+/** Stop a currently-ringing alarm (cancels the displayed notification + sound). */
+export async function cancelRinging(alarmId: string): Promise<void> {
+  await notifee.cancelNotification(notificationId(alarmId));
+  await notifee.cancelNotification(`snooze-${alarmId}`);
 }
 
-/** Rebuild the full schedule from the current alarm list. */
+/** Rebuild the full trigger schedule from the current alarm list. */
 export async function syncAlarms(alarms: Alarm[]): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  const pending = await notifee.getTriggerNotificationIds();
+
+  await Promise.all(pending.map((id) => notifee.cancelTriggerNotification(id)));
   await Promise.all(alarms.filter((alarm) => alarm.enabled).map(scheduleAlarm));
 }

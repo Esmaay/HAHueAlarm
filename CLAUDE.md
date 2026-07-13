@@ -36,11 +36,12 @@ require a **development build** — they do not run in Expo Go.
   - `format.ts` — pure time/schedule helpers (no React, unit-testable)
   - `store.ts` — persisted Zustand store (AsyncStorage), seeds an example on first launch
   - `editorStore.ts` — transient working draft shared across editor sub-screens
-  - `notifications.ts` — expo-notifications scheduling (per-sound Android channels)
-  - `audio.ts` — looping alarm playback with a volume ramp (expo-audio)
+  - `notifications.ts` — **Notifee** scheduling: exact AlarmManager triggers with a
+    full-screen action + looping sound, one channel per sound; fires over the lock screen
+  - `notifeeBackground.ts` — Notifee background event handler (registered at import)
   - `ringController.ts` — the "an alarm is ringing now" store + its side effects
-  - `AlarmRuntime.tsx` — headless root runtime: schedules, listens, fires on time
-  - `sounds.ts` — sound-id → bundled WAV asset map (tones synthesised in build)
+  - `AlarmRuntime.tsx` — headless root runtime: schedule sync, Notifee events, sunrise
+  - `sounds.ts` — sound ids (WAVs in `assets/sounds`, copied to res/raw at build)
   - `components/` — alarm-specific views (`AlarmListItem`, `TimePicker`, `SunrisePreview`, …)
 - **`src/features/sunrise/`** — `engine.ts`: ramps Hue brightness + colour temp over
   time via the HA client while an alarm rings; graceful fallback if HA is unreachable.
@@ -50,6 +51,9 @@ require a **development build** — they do not run in Expo Go.
     AsyncStorage — it holds a credential); runtime status + fetched light list
   - Credentials are entered in-app on `app/settings/home-assistant.tsx`, never committed.
 - **`src/theme/`** — the single source of design tokens. Dark-only by intent.
+- **`plugins/withAlarmAndroid.js`** — config plugin: flags MainActivity
+  show-when-locked / turn-screen-on and adds Notifee's maven repo, so the
+  full-screen intent can surface the ring screen on a locked phone.
 
 ## Conventions
 
@@ -71,7 +75,9 @@ scheduled notifications, looping audio with a volume ramp, the full-screen
 ringing screen (snooze / hold-to-stop / shake-to-dismiss), and the Hue sunrise
 firing on ring.
 
-Firing is reliable while the app is foregrounded (a precise in-app timer) and
-via notifications when backgrounded. **Known gap:** true locked-screen /
-app-killed full-screen firing needs Notifee (`AlarmManager` + full-screen
-intents) — the next reliability iteration, best done with on-device testing.
+Firing now goes through **Notifee** — exact AlarmManager triggers with a
+full-screen intent + looping sound — so alarms ring and surface the ring screen
+**over the lock screen**. The pre-alarm Hue sunrise ramp still runs from a
+foreground timer (JS), so it needs the app open; moving the ramp to a Home
+Assistant automation is the path to always-on light. Locked-screen firing needs
+**on-device verification** (can't be tested from CI).
